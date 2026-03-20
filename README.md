@@ -102,7 +102,6 @@ NEON   : a*b = 100
 To benchmark performance with random `a` and `b`:
 
 ```bash
-cd mult_toeplitz/
 make perfs_{size}
 ```
 
