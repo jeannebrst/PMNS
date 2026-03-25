@@ -78,10 +78,12 @@ int main(int argc, char **argv) {
     get_gen_16(gen_Mtiprime16, ((fp_param)((field_srcptr)f)->param)->AMNS->Mtiprime);
     get_gen_from_vec(gen_B, *(fp_elt_srcptr)(*d), ((fp_param)((field_srcptr)f)->param)->AMNS->lambda);
 
+    int rec = 2; // paramètre pour niveau de récursivité de certaines opérations, peut être 0, 1 ou 2 (si > 2, sera interprété comme 2)
+
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start1);
     for (i=0; i<nb_iteration; i++)
     {
-        mult_jeanne(res, c, d, f, STACK_1, gen_B, gen_Mtiprime16, gen_Mti16);
+        mult_jeanne(res, c, d, f, STACK_1, gen_B, gen_Mtiprime16, gen_Mti16, rec);
     }
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end1);
     diff2 = BILLION * (end1.tv_sec - start1.tv_sec) + (end1.tv_nsec - start1.tv_nsec);
@@ -91,7 +93,7 @@ int main(int argc, char **argv) {
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start1);
     for (i=0; i<nb_iteration; i++)
     {
-        mult_jeanne_neon(res, c, d, f, STACK_1, gen_B, gen_Mtiprime16, gen_Mti16);
+        mult_jeanne_neon(res, c, d, f, STACK_1, gen_B, gen_Mtiprime16, gen_Mti16, rec);
     }
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end1);
     diff3 = BILLION * (end1.tv_sec - start1.tv_sec) + (end1.tv_nsec - start1.tv_nsec);

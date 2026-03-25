@@ -293,7 +293,20 @@ static void mult_toeplitz_8_Mp(amns_block * restrict result, amns_block * restri
     }
 }
 
-static void mult_toeplitz_16_Mp(amns_block * restrict result, amns_llong * restrict V, amns_block gen_Mtiprime16[31]) {
+static void mult_8_Mp(amns_block * restrict result, amns_block * restrict v, amns_block * restrict M) {
+    /*
+    Calcule un produit intermédiaire d'un vecteur V de longueur 8 avec un vecteur M de longueur 15 (c'est un générateur de matrice de Toeplitz).
+    */
+
+    for (int i = 0; i < 8; i++) {
+        result[i] = 0;
+        for (int j = 0; j < 8; j++) {
+            result[i] += (amns_llong)v[j] * M[7 - j + i];
+        }
+    }
+}
+
+static void mult_toeplitz_16_Mp(amns_block * restrict result, amns_llong * restrict V, amns_block gen_Mtiprime16[31], int rec) {
     /*
     Calcule un produit vecteur-matrice dans le cas où la matrice est de Toeplitz et est 16*16.
     
@@ -302,44 +315,53 @@ static void mult_toeplitz_16_Mp(amns_block * restrict result, amns_llong * restr
 
     amns_block *gen_Mti = gen_Mtiprime16;
 
-    // for(int i = 0; i < 16; i++)
-    // {
-    //     result[i] = 0;
-    //     for(int j = 0; j < 16; j++)
-    //         result[i] += V[j]*gen_Mti[15-j+i];
-    // }
+    if (rec == 0) {
+        for(int i = 0; i < 16; i++)
+        {
+            result[i] = 0;
+            for(int j = 0; j < 16; j++)
+                result[i] += V[j]*gen_Mti[15-j+i];
+        }
+    } else {
 
-    amns_block v[16];
+        amns_block v[16];
 
-    for(int i = 0; i < 16; i++) {
-        v[i] = V[i];
-    }
+        for(int i = 0; i < 16; i++) {
+            v[i] = V[i];
+        }
 
-    amns_block p0[8], p1[8], p2[8];
-    amns_block v0p1[8];
-    const amns_block *v1 = v + 8;
-    amns_block m0m1[15], m0m2[15];
+        amns_block p0[8], p1[8], p2[8];
+        amns_block v0p1[8];
+        const amns_block *v1 = v + 8;
+        amns_block m0m1[15], m0m2[15];
 
-    for (int i = 0; i < 8; i++) {
-        v0p1[i] = v[i] + v1[i];
-    }
+        for (int i = 0; i < 8; i++) {
+            v0p1[i] = v[i] + v1[i];
+        }
 
-    for (int i = 0; i < 15; i++) {
-        amns_block g0 = gen_Mti[i];
-        amns_block g1 = gen_Mti[8 + i];
-        amns_block g2 = gen_Mti[16 + i];
+        for (int i = 0; i < 15; i++) {
+            amns_block g0 = gen_Mti[i];
+            amns_block g1 = gen_Mti[8 + i];
+            amns_block g2 = gen_Mti[16 + i];
 
-        m0m1[i] = g1 - g2;
-        m0m2[i] = g1 - g0;
-    }
+            m0m1[i] = g1 - g2;
+            m0m2[i] = g1 - g0;
+        }
 
-    mult_toeplitz_8_Mp(p0, v0p1, gen_Mti + 8);
-    mult_toeplitz_8_Mp(p1, v, m0m1);
-    mult_toeplitz_8_Mp(p2, v + 8, m0m2);
+        if (rec == 1) {
+            mult_8_Mp(p0, v0p1, gen_Mti + 8);
+            mult_8_Mp(p1, v, m0m1);
+            mult_8_Mp(p2, v + 8, m0m2);
+        } else  {
+            mult_toeplitz_8_Mp(p0, v0p1, gen_Mti + 8);
+            mult_toeplitz_8_Mp(p1, v, m0m1);
+            mult_toeplitz_8_Mp(p2, v + 8, m0m2);
+        }
 
-    for (int i = 0; i < 8; i++) {
-        result[i] = p0[i] - p2[i];
-        result[i + 8] = p0[i] - p1[i];
+        for (int i = 0; i < 8; i++) {
+            result[i] = p0[i] - p2[i];
+            result[i + 8] = p0[i] - p1[i];
+        }
     }
 }
 
@@ -387,7 +409,7 @@ static void mult_toeplitz_16_M(amns_llong * restrict result, amns_block * restri
     // }
 }
 
-static void amns_internal_red_16_jeanne(amns_elt_ptr S, amns_llong * V, amns_srcptr AMNS, amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31]) {
+static void amns_internal_red_16_jeanne(amns_elt_ptr S, amns_llong * V, amns_srcptr AMNS, amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31], int rec) {
     /* 
     Réduit les coefficients de V pour qu'il reste dans l'AMNS.
     */
@@ -395,7 +417,7 @@ static void amns_internal_red_16_jeanne(amns_elt_ptr S, amns_llong * V, amns_src
     int8_t i;
 
     amns_block Q[16];
-    mult_toeplitz_16_Mp(Q, V, gen_Mtiprime16);
+    mult_toeplitz_16_Mp(Q, V, gen_Mtiprime16, rec);
 
     amns_llong T[16];
     mult_toeplitz_16_M(T, Q, gen_Mti16);
@@ -404,25 +426,24 @@ static void amns_internal_red_16_jeanne(amns_elt_ptr S, amns_llong * V, amns_src
         amns_llong tmp = V[i] + T[i];
         S[i] = (amns_block)(tmp >> AMNS_WORD_SIZE);
     }
-    
 }
 
-static void amns_elt_mul_jeanne(amns_elt_ptr restrict c, amns_elt_ptr restrict a, amns_elt_ptr restrict b, amns_srcptr restrict AMNS, amns_block gen_B[31], amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31]) {
+static void amns_elt_mul_jeanne(amns_elt_ptr restrict c, amns_elt_ptr restrict a, amns_elt_ptr restrict b, amns_srcptr restrict AMNS, amns_block gen_B[31], amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31], int rec) {
 
     amns_llong tm[16] __attribute__((aligned(64)));
     mult_toeplitz_16_gen(tm, a, gen_B);
 
-    amns_internal_red_16_jeanne(c, tm, AMNS, gen_Mtiprime16, gen_Mti16);
+    amns_internal_red_16_jeanne(c, tm, AMNS, gen_Mtiprime16, gen_Mti16, rec);
 }
 
-static void fp_elt_mul_jeanne(fp_elt_ptr dst, fp_elt_srcptr src1, fp_elt_srcptr src2, const fp_param param, uint8_t stack, amns_block gen_B[31], amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31]) {
+static void fp_elt_mul_jeanne(fp_elt_ptr dst, fp_elt_srcptr src1, fp_elt_srcptr src2, const fp_param param, uint8_t stack, amns_block gen_B[31], amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31], int rec) {
 
-    amns_elt_mul_jeanne(*dst, *src1, *src2, param->AMNS, gen_B, gen_Mtiprime16, gen_Mti16);
+    amns_elt_mul_jeanne(*dst, *src1, *src2, param->AMNS, gen_B, gen_Mtiprime16, gen_Mti16, rec);
 }
 
-void mult_jeanne(fe_ptr c, fe_srcptr a, fe_srcptr b, field_srcptr f, uint8_t stack, amns_block gen_B[31], amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31]) {
+void mult_jeanne(fe_ptr c, fe_srcptr a, fe_srcptr b, field_srcptr f, uint8_t stack, amns_block gen_B[31], amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31], int rec) {
 
-    fp_elt_mul_jeanne((fp_elt_ptr)(*c), (fp_elt_srcptr)(*a), (fp_elt_srcptr)(*b), f->param, stack, gen_B, gen_Mtiprime16, gen_Mti16);
+    fp_elt_mul_jeanne((fp_elt_ptr)(*c), (fp_elt_srcptr)(*a), (fp_elt_srcptr)(*b), f->param, stack, gen_B, gen_Mtiprime16, gen_Mti16, rec);
 }
 
 //--------------------------------------------------------------------------
@@ -460,29 +481,6 @@ static void mult_toeplitz_16_gen_neon(amns_llong * restrict result, amns_block *
         vst1q_s64(&result[i], acc0);
         vst1q_s64(&result[i + 2], acc1);
     }
-
-    // int i;
-    // for(i = 0; i < 16; i += 4) {
-    //     int64x2_t acc0 = vdupq_n_s64(0);
-    //     int64x2_t acc1 = vdupq_n_s64(0);
-
-    //     for(int j = 0; j < 16; j++) {
-    //         int32x4_t vM = vld1q_s32(&gen_Mti[15 + i - j]);
-
-    //         int32x2_t vM_low = vget_low_s32(vM);
-    //         int32x2_t vM_high = vget_high_s32(vM);
-
-    //         int32_t v = V[j];
-
-    //         int32x2_t vV = vdup_n_s32(v);
-
-    //         acc0 = vmlal_s32(acc0, vV, vM_low);
-    //         acc1 = vmlal_s32(acc1, vV, vM_high);
-    //     }
-
-    //     vst1q_s64(&result[i], acc0);
-    //     vst1q_s64(&result[i + 2], acc1);
-    // }
 
     // amns_llong p0[8], p1[8], p2[8];
     // amns_block v0m1[8];
@@ -561,7 +559,34 @@ static void mult_toeplitz_8_Mp_neon(amns_block * restrict result, amns_block * r
     }
 }
 
-static void mult_toeplitz_16_Mp_neon(amns_block * restrict result, amns_llong * restrict V, amns_block gen_Mtiprime16[31]) {
+static void mult_8_Mp_neon(amns_block * restrict result, amns_block * restrict V, amns_block * restrict M) {
+    /*
+    Calcule un produit intermédiaire d'un vecteur V de longueur 8 avec un vecteur M de longueur 15 (c'est un générateur de matrice de Toeplitz).
+    */
+
+    int32x4_t acc0 = vdupq_n_s32(0);
+
+    for (int j = 0; j < 8; j++) {
+        int32x4_t vV = vdupq_n_s32(V[j]);
+        int32x4_t vM = vld1q_s32(&M[7 - j]);
+        acc0 = vmlaq_s32(acc0, vV, vM);
+    }
+
+    vst1q_s32(&result[0], acc0);
+
+    // --- Bloc 1 : result[4..7] ---
+    int32x4_t acc1 = vdupq_n_s32(0);
+
+    for (int j = 0; j < 8; j++) {
+        int32x4_t vV = vdupq_n_s32(V[j]);
+        int32x4_t vM = vld1q_s32(&M[7 - j + 4]);
+        acc1 = vmlaq_s32(acc1, vV, vM);
+    }
+
+    vst1q_s32(&result[4], acc1);
+}
+
+static void mult_toeplitz_16_Mp_neon(amns_block * restrict result, amns_llong * restrict V, amns_block gen_Mtiprime16[31], int rec) {
     /*
     Calcule un produit vecteur-matrice dans le cas où la matrice est de Toeplitz et est 16*16.
     
@@ -570,44 +595,76 @@ static void mult_toeplitz_16_Mp_neon(amns_block * restrict result, amns_llong * 
 
     amns_block *gen_Mti = gen_Mtiprime16;
 
-    // for(int i = 0; i < 16; i++)
-    // {
-    //     result[i] = 0;
-    //     for(int j = 0; j < 16; j++)
-    //         result[i] += V[j]*gen_Mti[15-j+i];
-    // }
+    if (rec == 0) {
+        for(int i = 0; i < 16; i += 4) {
+            int32x2_t acc0 = vdup_n_s32(0);
+            int32x2_t acc1 = vdup_n_s32(0);
 
-    amns_block v[16];
+            for(int j = 0; j < 16; j++) {
+                int32x4_t vM = vld1q_s32(&gen_Mti[15 + i - j]);
 
-    for(int i = 0; i < 16; i++) {
-        v[i] = V[i];
-    }
+                int32x2_t vM_low = vget_low_s32(vM);
+                int32x2_t vM_high = vget_high_s32(vM);
 
-    amns_block p0[8], p1[8], p2[8];
-    amns_block v0p1[8];
-    const amns_block *v1 = v + 8;
-    amns_block m0m1[15], m0m2[15];
+                amns_block v = (amns_block)V[j];
 
-    for (int i = 0; i < 8; i++) {
-        v0p1[i] = v[i] + v1[i];
-    }
+                int32x2_t vV = vdup_n_s32(v);
 
-    for (int i = 0; i < 15; i++) {
-        amns_block g0 = gen_Mti[i];
-        amns_block g1 = gen_Mti[8 + i];
-        amns_block g2 = gen_Mti[16 + i];
+                acc0 = vmla_s32(acc0, vV, vM_low);
+                acc1 = vmla_s32(acc1, vV, vM_high);
+            }
 
-        m0m1[i] = g1 - g2;
-        m0m2[i] = g1 - g0;
-    }
+            amns_block tmp0[2], tmp1[2];
 
-    mult_toeplitz_8_Mp_neon(p0, v0p1, gen_Mti + 8);
-    mult_toeplitz_8_Mp_neon(p1, v, m0m1);
-    mult_toeplitz_8_Mp_neon(p2, v + 8, m0m2);
+            vst1_s32(tmp0, acc0);
+            vst1_s32(tmp1, acc1);
 
-    for (int i = 0; i < 8; i++) {
-        result[i] = p0[i] - p2[i];
-        result[i + 8] = p0[i] - p1[i];
+            result[i] = (amns_block)tmp0[0];
+            result[i + 1] = (amns_block)tmp0[1];
+            result[i + 2] = (amns_block)tmp1[0];
+            result[i + 3] = (amns_block)tmp1[1];
+        }
+
+    } else {
+
+        amns_block v[16];
+
+        for(int i = 0; i < 16; i++) {
+            v[i] = V[i];
+        }
+
+        amns_block p0[8], p1[8], p2[8];
+        amns_block v0p1[8];
+        const amns_block *v1 = v + 8;
+        amns_block m0m1[15], m0m2[15];
+
+        for (int i = 0; i < 8; i++) {
+            v0p1[i] = v[i] + v1[i];
+        }
+
+        for (int i = 0; i < 15; i++) {
+            amns_block g0 = gen_Mti[i];
+            amns_block g1 = gen_Mti[8 + i];
+            amns_block g2 = gen_Mti[16 + i];
+
+            m0m1[i] = g1 - g2;
+            m0m2[i] = g1 - g0;
+        }
+
+        if (rec == 1) {
+            mult_8_Mp_neon(p0, v0p1, gen_Mti + 8);
+            mult_8_Mp_neon(p1, v, m0m1);
+            mult_8_Mp_neon(p2, v + 8, m0m2);
+        } else {
+            mult_toeplitz_8_Mp_neon(p0, v0p1, gen_Mti + 8);
+            mult_toeplitz_8_Mp_neon(p1, v, m0m1);
+            mult_toeplitz_8_Mp_neon(p2, v + 8, m0m2);
+        }
+
+        for (int i = 0; i < 8; i++) {
+            result[i] = p0[i] - p2[i];
+            result[i + 8] = p0[i] - p1[i];
+        }
     }
 }
 
@@ -671,7 +728,7 @@ static void mult_toeplitz_16_M_neon(amns_llong * restrict result, amns_block * r
     // }
 }
 
-static void amns_internal_red_16_jeanne_neon(amns_elt_ptr S, amns_llong * V, amns_srcptr AMNS, amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31]) {
+static void amns_internal_red_16_jeanne_neon(amns_elt_ptr S, amns_llong * V, amns_srcptr AMNS, amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31], int rec) {
     /* 
     Réduit les coefficients de V pour qu'il reste dans l'AMNS.
     */
@@ -679,7 +736,7 @@ static void amns_internal_red_16_jeanne_neon(amns_elt_ptr S, amns_llong * V, amn
     int8_t i;
 
     amns_block Q[16];
-    mult_toeplitz_16_Mp_neon(Q, V, gen_Mtiprime16);
+    mult_toeplitz_16_Mp_neon(Q, V, gen_Mtiprime16, rec);
 
     amns_llong T[16];
     mult_toeplitz_16_M_neon(T, Q, gen_Mti16);
@@ -691,20 +748,20 @@ static void amns_internal_red_16_jeanne_neon(amns_elt_ptr S, amns_llong * V, amn
     
 }
 
-static void amns_elt_mul_jeanne_neon(amns_elt_ptr restrict c, amns_elt_ptr restrict a, amns_elt_ptr restrict b, amns_srcptr restrict AMNS, amns_block gen_B[31], amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31]) {
+static void amns_elt_mul_jeanne_neon(amns_elt_ptr restrict c, amns_elt_ptr restrict a, amns_elt_ptr restrict b, amns_srcptr restrict AMNS, amns_block gen_B[31], amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31], int rec) {
 
     amns_llong tm[16] __attribute__((aligned(64)));
     mult_toeplitz_16_gen_neon(tm, a, gen_B);
 
-    amns_internal_red_16_jeanne_neon(c, tm, AMNS, gen_Mtiprime16, gen_Mti16);
+    amns_internal_red_16_jeanne_neon(c, tm, AMNS, gen_Mtiprime16, gen_Mti16, rec);
 }
 
-static void fp_elt_mul_jeanne_neon(fp_elt_ptr dst, fp_elt_srcptr src1, fp_elt_srcptr src2, const fp_param param, uint8_t stack, amns_block gen_B[31], amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31]) {
+static void fp_elt_mul_jeanne_neon(fp_elt_ptr dst, fp_elt_srcptr src1, fp_elt_srcptr src2, const fp_param param, uint8_t stack, amns_block gen_B[31], amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31], int rec) {
 
-    amns_elt_mul_jeanne_neon(*dst, *src1, *src2, param->AMNS, gen_B, gen_Mtiprime16, gen_Mti16);
+    amns_elt_mul_jeanne_neon(*dst, *src1, *src2, param->AMNS, gen_B, gen_Mtiprime16, gen_Mti16, rec);
 }
 
-void mult_jeanne_neon(fe_ptr c, fe_srcptr a, fe_srcptr b, field_srcptr f, uint8_t stack, amns_block gen_B[31], amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31]) {
+void mult_jeanne_neon(fe_ptr c, fe_srcptr a, fe_srcptr b, field_srcptr f, uint8_t stack, amns_block gen_B[31], amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31], int rec) {
 
-    fp_elt_mul_jeanne_neon((fp_elt_ptr)(*c), (fp_elt_srcptr)(*a), (fp_elt_srcptr)(*b), f->param, stack, gen_B, gen_Mtiprime16, gen_Mti16);
+    fp_elt_mul_jeanne_neon((fp_elt_ptr)(*c), (fp_elt_srcptr)(*a), (fp_elt_srcptr)(*b), f->param, stack, gen_B, gen_Mtiprime16, gen_Mti16, rec);
 }

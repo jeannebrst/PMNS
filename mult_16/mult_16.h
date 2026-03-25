@@ -13,7 +13,7 @@ static amns_block gen_B[31];
 void get_gen_from_vec(amns_block gen[31], amns_block B[16], amns_block lambda);
 void get_gen_16(amns_block gen_Mti[31], amns_elt * Mti);
 
-void mult_jeanne(fe_ptr c, fe_srcptr a, fe_srcptr b, field_srcptr f, uint8_t stack, amns_block gen_B[31], amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31]);
-void mult_jeanne_neon(fe_ptr c, fe_srcptr a, fe_srcptr b, field_srcptr f, uint8_t stack, amns_block gen_B[31], amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31]);
+void mult_jeanne(fe_ptr c, fe_srcptr a, fe_srcptr b, field_srcptr f, uint8_t stack, amns_block gen_B[31], amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31], int rec);
+void mult_jeanne_neon(fe_ptr c, fe_srcptr a, fe_srcptr b, field_srcptr f, uint8_t stack, amns_block gen_B[31], amns_block gen_Mtiprime16[31], amns_block gen_Mti16[31], int rec);
 
 #endif

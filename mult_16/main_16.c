@@ -41,8 +41,8 @@ int main(int argc, char **argv) {
 
     number_set_str(p, char_p, 10);
 
-    char *amns_param = get_amns_param(char_p, "16");
-    // char *amns_param = "[15, 16, [-2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 18, 1732996756754789471339355312096369946981361386195029723648, [-2239, -494, -130, -54, -772, 615, -474, -1531, 1849, -895, -1125, -289, 438, -1978, 590, 1077], [4092435061, 3150241284, 3437500926, 2483521910, 1913883334, 2800600421, 2868738738, 3215995195, 1101386429, 229037773, 2613946518, 4042815467, 3393698058, 1925116940, 1693409253, 1245900174], [-5701, -3453, -5708, -4336, -4736, -3772, -3384, -5334, -4480, -2794, -2698, -4467, -761, -3023, -3378, -1571], [-1812, -10495, 232, -4276, -8242, -1249, -1563, -6222, -3852, 97, -6506, -2222, 120, -4246, -3666, -1254]]";
+    // char *amns_param = get_amns_param(char_p, "16");
+    char *amns_param = "[15, 16, [-2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 18, 1732996756754789471339355312096369946981361386195029723648, [-2239, -494, -130, -54, -772, 615, -474, -1531, 1849, -895, -1125, -289, 438, -1978, 590, 1077], [4092435061, 3150241284, 3437500926, 2483521910, 1913883334, 2800600421, 2868738738, 3215995195, 1101386429, 229037773, 2613946518, 4042815467, 3393698058, 1925116940, 1693409253, 1245900174], [-5701, -3453, -5708, -4336, -4736, -3772, -3384, -5334, -4480, -2794, -2698, -4467, -761, -3023, -3378, -1571], [-1812, -10495, 232, -4276, -8242, -1249, -1563, -6222, -3852, 97, -6506, -2222, 120, -4246, -3666, -1254]]";
 
     amns AMNS;
 
@@ -69,10 +69,12 @@ int main(int argc, char **argv) {
     get_gen_16(gen_Mtiprime16, ((fp_param)((field_srcptr)f)->param)->AMNS->Mtiprime);
     get_gen_from_vec(gen_B, *(fp_elt_srcptr)(*b), ((fp_param)((field_srcptr)f)->param)->AMNS->lambda);
 
-    mult_jeanne(c, a, b, f, STACK_1, gen_B, gen_Mtiprime16, gen_Mti16);
+    int rec = 2; // paramètre pour niveau de récursivité de certaines opérations, peut être 0, 1 ou 2 (si > 2, sera interprété comme 2)
+
+    mult_jeanne(c, a, b, f, STACK_1, gen_B, gen_Mtiprime16, gen_Mti16, rec);
     printf("\nNormal : a*b = "); field_elt_print(c, 10, true, f, STACK_1); printf("\n\n");
 
-    mult_jeanne_neon(c, a, b, f, STACK_1, gen_B, gen_Mtiprime16, gen_Mti16);
+    mult_jeanne_neon(c, a, b, f, STACK_1, gen_B, gen_Mtiprime16, gen_Mti16, rec);
     printf("\nNEON : a*b = "); field_elt_print(c, 10, true, f, STACK_1); printf("\n\n");
 
     if(amns_param) {
